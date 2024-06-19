@@ -1,1 +1,2 @@
 # Student-Grading-System
+ The provided C# program manages faculty and student interactions, allowing faculty to register students, record their grades, and store the data in a MySQL database. It includes login functionalities for both faculty and students, validates inputs, calculates total marks and grades, and displays student results. The program connects to a MySQL database to store the student data and utilizes various classes to represent students, courses, and grades.
