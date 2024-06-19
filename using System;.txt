@@ -1,0 +1,341 @@
+using System;
+using System.Collections.Generic;
+using MySql.Data.MySqlClient;
+
+public class Program
+{
+    static Dictionary<string, string> facultyLogin = new Dictionary<string, string>();
+    static Dictionary<string, Student> studentLogin = new Dictionary<string, Student>();
+    static Dictionary<string, (string, string, int)> facultyCourseInfo = new Dictionary<string, (string, string, int)>();
+    static string connectionString = "server=localhost;database=c_sharp_projectdatabase;uid=root;password=9008926082;";
+
+    static void Main(string[] args)
+    {
+        // Initialize faculty login
+        facultyLogin.Add("faculty21AI51", "0121AI51");
+        facultyLogin.Add("faculty21AI52", "0221AI52");
+        facultyLogin.Add("faculty21AI53", "0321AI53");
+        facultyLogin.Add("faculty21CS543", "0421CS543");
+        facultyLogin.Add("faculty21ADA580", "0821ADA580");
+        facultyLogin.Add("faculty21CS551", "0521CS551");
+        facultyLogin.Add("faculty21CS581", "0921CS581");
+        facultyLogin.Add("faculty21ENV59", "1021ENV59");
+
+        // Initialize faculty course information
+        facultyCourseInfo.Add("faculty21AI51", ("Artificial Intelligence", "21AI51", 3));
+        facultyCourseInfo.Add("faculty21AI52", ("Digital Image Processing", "21AI52", 3));
+        facultyCourseInfo.Add("faculty21AI53", ("Database Management System", "21AI53", 3));
+        facultyCourseInfo.Add("faculty21CS543", ("Cyber Security", "21CS543", 3));
+        facultyCourseInfo.Add("faculty21ADA580", ("Advanced Aptitude", "21ADA580", 1));
+        facultyCourseInfo.Add("faculty21CS551", ("Computer Networking", "21CS551", 3));
+        facultyCourseInfo.Add("faculty21CS581", ("C# and .Net Framework", "21CS581", 1));
+        facultyCourseInfo.Add("faculty21ENV59", ("Environment Studies", "21ENV59", 1));
+
+        // Faculty login
+        Console.WriteLine("Faculty Login:");
+        if (!FacultyLogin())
+        {
+            Console.WriteLine("Invalid faculty credentials.");
+            return;
+        }
+
+        // Student registration
+        Console.WriteLine("\nStudent Registration:");
+        Student student = FacultyRegistersStudent();
+
+        // Student login
+        Console.WriteLine("\nStudent Login:");
+        Student loggedInStudent = StudentLogin();
+        if (loggedInStudent == null)
+        {
+            Console.WriteLine("Invalid student credentials.");
+            return;
+        }
+
+        // Display student results
+        DisplayStudentResults(loggedInStudent);
+
+        // Store student data in MySQL database
+        StoreStudentData(loggedInStudent);
+
+        // Prompt the user to press any key to exit
+        Console.WriteLine("\nPress enter to exit...");
+        Console.ReadLine();
+    }
+
+    static bool FacultyLogin()
+    {
+        Console.Write("Enter username: ");
+        string username = Console.ReadLine();
+        Console.Write("Enter password: ");
+        string password = Console.ReadLine();
+
+        return facultyLogin.ContainsKey(username) && facultyLogin[username] == password;
+    }
+
+    static Student FacultyRegistersStudent()
+    {
+        // Input student information
+        string studentName;
+        do
+        {
+            Console.WriteLine("Enter student name (alphabets only):");
+            studentName = Console.ReadLine();
+        } while (!IsValidName(studentName));
+
+        string usn;
+        do
+        {
+            Console.WriteLine("Enter student USN (alphabets and numbers only):");
+            usn = Console.ReadLine();
+        } while (!IsValidUSN(usn));
+
+        // Get course info based on faculty login
+        string facultyUsername = "faculty21AI51"; // Default username for registration
+        Console.WriteLine("Enter faculty username :");
+        facultyUsername = Console.ReadLine();
+        var courseInfo = facultyCourseInfo[facultyUsername];
+
+        Student student = new Student(studentName, usn);
+
+        // Input course information
+        Course course = new Course(courseInfo.Item1, courseInfo.Item2, courseInfo.Item3);
+
+        // Input grades
+        int ia1Marks;
+        do
+        {
+            Console.WriteLine("Enter IA1 marks out of 30:");
+            ia1Marks = Convert.ToInt32(Console.ReadLine());
+        } while (!IsValidMarks(ia1Marks, 30));
+
+        int ia2Marks = GetValidMarks("IA2", 30);
+        int ia3Marks = GetValidMarks("IA3", 30);
+        int aat1Marks = GetValidMarks("AAT1", 20);
+        int aat2Marks = GetValidMarks("AAT2", 20);
+        int aat3Marks = GetValidMarks("AAT3", 20);
+        int seeMarks = GetValidMarks("SEE", 100);
+
+        Grade grade = new Grade(ia1Marks, ia2Marks, ia3Marks, aat1Marks, aat2Marks, aat3Marks, seeMarks);
+
+        // Add course and grade to the student's record
+        student.AddCourse(course, grade);
+
+        // Add student to student login
+        studentLogin.Add(usn, student);
+
+        return student;
+    }
+
+    static int GetValidMarks(string exam, int maxMarks)
+    {
+        int marks;
+        do
+        {
+            Console.WriteLine($"Enter {exam} marks out of {maxMarks}:");
+            marks = Convert.ToInt32(Console.ReadLine());
+        } while (!IsValidMarks(marks, maxMarks));
+        return marks;
+    }
+
+    static Student StudentLogin()
+    {
+        Console.Write("Enter USN: ");
+        string usn = Console.ReadLine();
+
+        if (studentLogin.ContainsKey(usn))
+        {
+            Student student = studentLogin[usn];
+            Console.WriteLine($"Total Marks: {CalculateTotalMarks(student.Courses)}"); // Print total marks
+            return student;
+        }
+        return null;
+    }
+
+    static double CalculateTotalMarks(Dictionary<Course, Grade> courses)
+    {
+        double totalMarks = 0;
+
+        foreach (var courseGrade in courses)
+        {
+            Grade grade = courseGrade.Value;
+            totalMarks += grade.TotalMarks;
+        }
+
+        return totalMarks;
+    }
+
+    static void DisplayStudentResults(Student student)
+    {
+        // Display student details and course information
+        Console.WriteLine($"Student Name: {student.Name}, USN: {student.USN}");
+
+        foreach (var courseGrade in student.Courses)
+        {
+            Console.WriteLine($"Course: {courseGrade.Key.Name} ({courseGrade.Key.Code}), Credits: {courseGrade.Key.Credits}");
+            Console.WriteLine($"IA1 Marks: {courseGrade.Value.IA1Marks}, IA2 Marks: {courseGrade.Value.IA2Marks}, IA3 Marks: {courseGrade.Value.IA3Marks}, AAT1 Marks: {courseGrade.Value.AAT1Marks}, AAT2 Marks: {courseGrade.Value.AAT2Marks}, AAT3 Marks: {courseGrade.Value.AAT3Marks}, Total CIE Marks: {courseGrade.Value.TotalCieMarks}, SEE Marks: {courseGrade.Value.SeeMarks}, Grade: {courseGrade.Value.GradeValue}");
+        }
+    }
+
+    static bool IsValidName(string name)
+    {
+        foreach (char c in name)
+        {
+            if (!char.IsLetter(c))
+            {
+                Console.WriteLine("Invalid name! Name should contain only alphabets.");
+                return false;
+            }
+        }
+        return true;
+    }
+
+    static bool IsValidUSN(string usn)
+    {
+        foreach (char c in usn)
+        {
+            if (!char.IsLetterOrDigit(c))
+            {
+                Console.WriteLine("Invalid USN! USN should contain only alphabets and numbers.");
+                return false;
+            }
+        }
+        return true;
+    }
+
+    static bool IsValidMarks(int marks, int maxMarks)
+    {
+        if (marks < 0 || marks > maxMarks)
+        {
+            Console.WriteLine($"Marks should be between 0 and {maxMarks}.");
+            return false;
+        }
+        return true;
+    }
+
+    static void StoreStudentData(Student student)
+    {
+        try
+        {
+            using (MySqlConnection connection = new MySqlConnection(connectionString))
+            {
+                connection.Open();
+
+                foreach (var courseGrade in student.Courses)
+                {
+                    string query = "INSERT INTO student_data (usn, course_name, course_code, ia1_marks, ia2_marks, ia3_marks, aat1_marks, aat2_marks, aat3_marks, see_marks, total_marks, grade) VALUES (@usn, @name, @code, @ia1, @ia2, @ia3, @aat1, @aat2, @aat3, @see, @total, @grade)";
+
+                    using (MySqlCommand command = new MySqlCommand(query, connection))
+                    {
+                        command.Parameters.AddWithValue("@usn", student.USN);
+                        command.Parameters.AddWithValue("@name", courseGrade.Key.Name);
+                        command.Parameters.AddWithValue("@code", courseGrade.Key.Code);
+                        command.Parameters.AddWithValue("@ia1", courseGrade.Value.IA1Marks);
+                        command.Parameters.AddWithValue("@ia2", courseGrade.Value.IA2Marks);
+                        command.Parameters.AddWithValue("@ia3", courseGrade.Value.IA3Marks);
+                        command.Parameters.AddWithValue("@aat1", courseGrade.Value.AAT1Marks);
+                        command.Parameters.AddWithValue("@aat2", courseGrade.Value.AAT2Marks);
+                        command.Parameters.AddWithValue("@aat3", courseGrade.Value.AAT3Marks);
+                        command.Parameters.AddWithValue("@see", courseGrade.Value.SeeMarks);
+                        command.Parameters.AddWithValue("@total", courseGrade.Value.TotalMarks);
+                        command.Parameters.AddWithValue("@grade", courseGrade.Value.GradeValue);
+
+                        command.ExecuteNonQuery();
+                    }
+                }
+            }
+
+            Console.WriteLine("Student data stored successfully in the database.");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"An error occurred: {ex.Message}");
+        }
+    }
+}
+
+public class Student
+{
+    public string Name { get; }
+    public string USN { get; }
+    public Dictionary<Course, Grade> Courses { get; }
+
+    public Student(string name, string usn)
+    {
+        Name = name;
+        USN = usn;
+        Courses = new Dictionary<Course, Grade>();
+    }
+
+    public void AddCourse(Course course, Grade grade)
+    {
+        Courses.Add(course, grade);
+    }
+}
+
+public class Course
+{
+    public string Name { get; }
+    public string Code { get; }
+    public int Credits { get; }
+
+    public Course(string name, string code, int credits = 3)
+    {
+        Name = name;
+        Code = code;
+        Credits = credits;
+    }
+}
+
+public class Grade
+{
+    public int IA1Marks { get; }
+    public int IA2Marks { get; }
+    public int IA3Marks { get; }
+    public int AAT1Marks { get; }
+    public int AAT2Marks { get; }
+    public int AAT3Marks { get; }
+    public double TotalCieMarks { get; }
+    public int SeeMarks { get; }
+    public double TotalMarks { get; } // Total marks = CIE + SEE / 2
+    public string GradeValue { get; }
+
+    public Grade(int ia1Marks, int ia2Marks, int ia3Marks, int aat1Marks, int aat2Marks, int aat3Marks, int seeMarks)
+    {
+        IA1Marks = ia1Marks;
+        IA2Marks = ia2Marks;
+        IA3Marks = ia3Marks;
+        AAT1Marks = aat1Marks;
+        AAT2Marks = aat2Marks;
+        AAT3Marks = aat3Marks;
+        TotalCieMarks = (IA1Marks / 3.0 + IA2Marks / 3.0 + IA3Marks / 3.0) + (AAT1Marks + AAT2Marks + AAT3Marks);
+        SeeMarks = seeMarks;
+        TotalMarks = CalculateTotalMarks(); // Calculate total marks
+        GradeValue = CalculateGradeValue();
+    }
+
+    private double CalculateTotalMarks()
+    {
+        return TotalCieMarks + SeeMarks / 2.0;
+    }
+
+    private string CalculateGradeValue()
+    {
+        if (TotalMarks >= 40) // Assuming passing marks are 40
+        {
+            if (TotalMarks >= 90)
+                return "O";
+            else if (TotalMarks >= 80)
+                return "A+";
+            else if (TotalMarks >= 70)
+                return "A";
+            else if (TotalMarks >= 60)
+                return "B+";
+            else if (TotalMarks >= 50)
+                return "B";
+            else
+                return "P";
+        }
+        return "F";
+    }
+}
